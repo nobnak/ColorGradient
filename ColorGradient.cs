@@ -18,7 +18,6 @@ namespace ColorGradientSystem {
 
         [SerializeField] protected ColorGradientData data;
         [SerializeField] protected Shader shader;
-        [SerializeField] protected bool invalid;
 
         protected ScopedObject<Material> mat;
 
@@ -40,7 +39,7 @@ namespace ColorGradientSystem {
             };
             mouse.OnSelection += (m, s) => {
                 if (dragging && s.All(MouseTracker.ButtonFlag.Left)) {
-                    Invalidate();
+                    data.Invalidate();
                     var currPos = (Vector2)MousePositionUV();
                     var duv = currPos - prevPos;
                     var center = data.drops[selectedDropIndex].center;
@@ -54,13 +53,13 @@ namespace ColorGradientSystem {
                 if (s.All(MouseTracker.ButtonFlag.Left))
                     dragging = false;
             };
-            Invalidate();
+            data.Invalidate();
         }
         private void Update() {
             mouse.Update();
         }
         private void OnValidate() {
-            Invalidate();
+            data.Invalidate();
         }
         private void OnRenderImage(RenderTexture source, RenderTexture destination) {
             if (data == null) {
@@ -68,13 +67,14 @@ namespace ColorGradientSystem {
                 return;
             }
             
-            if (invalid)
+            if (data.invalid)
                 Validate();
 
             Graphics.Blit(source, destination, mat);
         }
         private void OnDisable() {
-            mat.Dispose();
+            if (mat != null)
+                mat.Dispose();
         }
         #endregion
 
@@ -84,11 +84,8 @@ namespace ColorGradientSystem {
         }
         #endregion
         
-        protected void Invalidate() {
-            invalid = true;
-        }
         protected void Validate() {
-            invalid = false;
+            data.invalid = false;
             var baseColor = data.baseColor;
             baseColor.a = data.blendAmount;
             var blendMode = (data.blendMode == BlendModeEnum.None ? null : data.blendMode.ToString());

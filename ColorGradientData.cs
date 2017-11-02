@@ -7,10 +7,25 @@ namespace ColorGradientSystem {
     [CreateAssetMenu]
     public class ColorGradientData : ScriptableObject {
 
+        public bool invalid;
+
         public ColorGradient.BlendModeEnum blendMode;
         [ColorUsage(false, true, 0f, 8f, 1f / 8, 3f)] public Color baseColor = Color.white;
         [Range(0f, 1f)] public float blendAmount = 1f;
         public Drop[] drops;
+
+        #region Unity
+        private void OnEnable() {
+            Invalidate();
+        }
+        protected void OnValidate() {
+            Invalidate();
+        }
+        #endregion
+
+        public void Invalidate() {
+            invalid = true;
+        }
 
         [System.Serializable]
         public class Drop {

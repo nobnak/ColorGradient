@@ -1,11 +1,13 @@
 fileFormatVersion: 2
 guid: e16c3d3c13d138d45a971ed2924adfd0
-timeCreated: 1509462307
+timeCreated: 1509616494
 licenseType: Pro
 MonoImporter:
   externalObjects: {}
   serializedVersion: 2
-  defaultReferences: []
+  defaultReferences:
+  - data: {instanceID: 0}
+  - shader: {fileID: 4800000, guid: 2bddbfc21cdd2b34d9834c1ee5c4a2ee, type: 3}
   executionOrder: 0
   icon: {instanceID: 0}
   userData: 
