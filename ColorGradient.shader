@@ -45,7 +45,7 @@
 				float2x4 sqdiff = diff * diff;
 				float4 metaball = _Throttles / (sqdiff[0] + sqdiff[1]);
 				float sum = metaball.x + metaball.y + metaball.z + metaball.w;
-				float4 t = metaball / sum;
+				float4 t = saturate(metaball / sum);
 
 				float4 cmain = tex2D(_MainTex, i.uv);
 				float4 cgrad = mul(_Colors, t) * _Color;
