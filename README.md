@@ -7,5 +7,4 @@
 ```
 git submodule add https://github.com/nobnak/Gist.git Assets/Packages/Gist
 git submodule add https://github.com/nobnak/ColorGradient.git Assets/Packages/ColorGradient
-git checkout Stable
 ```
