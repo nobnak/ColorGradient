@@ -1,4 +1,5 @@
-﻿using Gist.Scoped;
+﻿using Gist.InputDevice;
+using Gist.Scoped;
 using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
@@ -17,9 +18,11 @@ namespace ColorGradientSystem {
 
         [SerializeField] protected ColorGradientData data;
         [SerializeField] protected Shader shader;
+        [SerializeField] protected bool invalid;
 
         protected ScopedObject<Material> mat;
 
+        protected MouseTracker mouse;
         protected bool dragging;
         protected Vector2 prevPos;
         protected int selectedDropIndex;
@@ -27,37 +30,65 @@ namespace ColorGradientSystem {
         #region Unity
         private void OnEnable() {
             mat = new ScopedObject<Material>(new Material(shader));
-        }
-        private void Update() {
-            if (Input.GetMouseButtonDown(0)) {
-                prevPos = MousePositionUV();
-                if (TryToFindNearestDropIndex(out selectedDropIndex))
-                    dragging = true;
-            } else if (dragging) {
-                if (Input.GetMouseButton(0)) {
+            mouse = new MouseTracker();
+            mouse.OnSelectionDown += (m, s) => {
+                if (s.All(MouseTracker.ButtonFlag.Left)) {
+                    prevPos = MousePositionUV();
+                    if (TryToFindNearestDropIndex(out selectedDropIndex))
+                        dragging = true;
+                }
+            };
+            mouse.OnSelection += (m, s) => {
+                if (dragging && s.All(MouseTracker.ButtonFlag.Left)) {
+                    Invalidate();
                     var currPos = (Vector2)MousePositionUV();
                     var duv = currPos - prevPos;
-                    data.drops[selectedDropIndex].center += duv;
+                    var center = data.drops[selectedDropIndex].center;
+                    center.x = Mathf.Clamp01(center.x + duv.x);
+                    center.y = Mathf.Clamp01(center.y + duv.y);
+                    data.drops[selectedDropIndex].center = center;
                     prevPos = currPos;
-                } else
-                    dragging = false;
-            }
-        }
-
-        private bool TryToFindNearestDropIndex(out int dropIndex) {
-            dropIndex = -1;
-            var sqdist = float.MaxValue;
-            for (var i = 0; i < data.drops.Length; i++) {
-                var dd = (data.drops[i].center - prevPos).sqrMagnitude;
-                if (dd < sqdist) {
-                    sqdist = dd;
-                    dropIndex = i;
                 }
-            }
-            return dropIndex >= 0;
+            };
+            mouse.OnSelectionUp += (m, s) => {
+                if (s.All(MouseTracker.ButtonFlag.Left))
+                    dragging = false;
+            };
+            Invalidate();
         }
-
+        private void Update() {
+            mouse.Update();
+        }
+        private void OnValidate() {
+            Invalidate();
+        }
         private void OnRenderImage(RenderTexture source, RenderTexture destination) {
+            if (data == null) {
+                Graphics.Blit(source, destination);
+                return;
+            }
+            
+            if (invalid)
+                Validate();
+
+            Graphics.Blit(source, destination, mat);
+        }
+        private void OnDisable() {
+            mat.Dispose();
+        }
+        #endregion
+
+        #region Static
+        protected static Vector3 MousePositionUV() {
+            return Camera.main.ScreenToViewportPoint(Input.mousePosition);
+        }
+        #endregion
+        
+        protected void Invalidate() {
+            invalid = true;
+        }
+        protected void Validate() {
+            invalid = false;
             var baseColor = data.baseColor;
             baseColor.a = data.blendAmount;
             var blendMode = (data.blendMode == BlendModeEnum.None ? null : data.blendMode.ToString());
@@ -72,19 +103,21 @@ namespace ColorGradientSystem {
             mat.Data.SetMatrix(PROP_COLORS, colors);
             mat.Data.SetMatrix(PROP_POSS, poss);
             mat.Data.SetVector(PROP_THROTTLES, throttles);
+        }
 
-            Graphics.Blit(source, destination, mat);
-        }
-        private void OnDisable() {
-            mat.Dispose();
-        }
-        #endregion
 
-        #region Static
-        protected static Vector3 MousePositionUV() {
-            return Camera.main.ScreenToViewportPoint(Input.mousePosition);
+        protected bool TryToFindNearestDropIndex(out int dropIndex) {
+            dropIndex = -1;
+            var sqdist = float.MaxValue;
+            for (var i = 0; i < data.drops.Length; i++) {
+                var dd = (data.drops[i].center - prevPos).sqrMagnitude;
+                if (dd < sqdist) {
+                    sqdist = dd;
+                    dropIndex = i;
+                }
+            }
+            return dropIndex >= 0;
         }
-        #endregion
 
         protected Matrix4x4 ToMatrix(params Vector4[] cols) {
             var m = Matrix4x4.zero;
