@@ -1,5 +1,5 @@
-﻿using Gist.InputDevice;
-using Gist.Scoped;
+﻿using nobnak.Gist.InputDevice;
+using nobnak.Gist.Scoped;
 using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
