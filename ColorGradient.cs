@@ -1,145 +1,196 @@
-﻿using nobnak.Gist.InputDevice;
+﻿using nobnak.Gist;
+using nobnak.Gist.Extensions.Behaviour;
 using nobnak.Gist.Scoped;
 using System.Collections;
 using System.Collections.Generic;
-using System.Linq;
 using UnityEngine;
 
-namespace ColorGradientSystem {
+namespace nobnak.ColorGradientSystem {
 
     [ExecuteInEditMode]
     public class ColorGradient : MonoBehaviour {
-        public enum BlendModeEnum { None = 0, BLEND_MULT, BLEND_SCRN, BLEND_OVRY }
-
+        public const string PROP_MAIN_TEX = "_MainTex";
+        public const string PROP_GRADIENT_TEX = "_GradientTex";
+        public const string PROP_NOISE_TEX = "_NoiseTex";
+        public const string PROP_UV_MATRIX = "_UVMatrix";
         public const string PROP_COLOR = "_Color";
-        public const string PROP_POSS = "_Poss";
-        public const string PROP_COLORS = "_Colors";
-        public const string PROP_THROTTLES = "_Throttles";
+        public const string PROP_GRADIENT_GAIN = "_GradientGain";
+        public const string PROP_NOISE_GAIN = "_NoiseGain";
 
-        [SerializeField] protected ColorGradientData data;
-        [SerializeField] protected Shader shader;
+        [SerializeField] protected Material gradientMat;
+        [SerializeField] protected Material noiseMat;
+        [SerializeField] protected Gradation[] gradations;
 
-        protected ScopedObject<Material> mat;
+        [SerializeField] protected Color gradientColor = Color.white;
+        [Range(0f, 10f)]
+        [SerializeField]
+        protected float gradientGain = 1f;
+        [Range(0f, 10f)]
+        [SerializeField]
+        protected float noiseGain;
 
-        protected MouseTracker mouse;
-        protected bool dragging;
-        protected Vector2 prevPos;
-        protected int selectedDropIndex;
+        protected Validator validator = new Validator();
+        protected ScopedObject<RenderTexture>[] noiseTextures;
 
-        #region Unity
         private void OnEnable() {
-            mat = new ScopedObject<Material>(new Material(shader));
-            mouse = new MouseTracker();
-            mouse.OnSelectionDown += (m, s) => {
-                if (s.All(MouseTracker.ButtonFlag.Left)) {
-                    prevPos = MousePositionUV();
-                    if (TryToFindNearestDropIndex(out selectedDropIndex))
-                        dragging = true;
+            validator.Validation += () => {
+                foreach (var g in gradations) {
+                    if (g != null)
+                        g.Invalidate();
                 }
             };
-            mouse.OnSelection += (m, s) => {
-                if (dragging && s.All(MouseTracker.ButtonFlag.Left)) {
-                    data.Invalidate();
-                    var currPos = (Vector2)MousePositionUV();
-                    var duv = currPos - prevPos;
-                    var center = data.drops[selectedDropIndex].center;
-                    center.x = Mathf.Clamp01(center.x + duv.x);
-                    center.y = Mathf.Clamp01(center.y + duv.y);
-                    data.drops[selectedDropIndex].center = center;
-                    prevPos = currPos;
-                }
-            };
-            mouse.OnSelectionUp += (m, s) => {
-                if (s.All(MouseTracker.ButtonFlag.Left))
-                    dragging = false;
-            };
-            data.Invalidate();
-        }
-        private void Update() {
-            mouse.Update();
-        }
-        private void OnValidate() {
-            data.Invalidate();
-        }
-        private void OnRenderImage(RenderTexture source, RenderTexture destination) {
-            if (data == null) {
-                Graphics.Blit(source, destination);
-                return;
-            }
-            
-            if (data.invalid)
-                Validate();
-
-            Graphics.Blit(source, destination, mat);
         }
         private void OnDisable() {
-            if (mat != null)
-                mat.Dispose();
+            validator.Reset();
         }
-        #endregion
-
-        #region Static
-        protected static Vector3 MousePositionUV() {
-            return Camera.main.ScreenToViewportPoint(Input.mousePosition);
+        private void OnValidate() {
+            validator.Invalidate();
         }
-        #endregion
-        
-        protected void Validate() {
-            data.invalid = false;
-            var baseColor = data.baseColor;
-            baseColor.a = data.blendAmount;
-            var blendMode = (data.blendMode == BlendModeEnum.None ? null : data.blendMode.ToString());
-            var colors = ToMatrix(Colors.ToArray());
-            var poss = ToMatrix(Poss.ToArray());
-            var throttles = ToVector4(Throttles.ToArray());
+        private void OnRenderImage(RenderTexture source, RenderTexture destination) {
+            validator.CheckValidation();
 
-            mat.Data.shaderKeywords = null;
-            mat.Data.EnableKeyword(blendMode);
+            var rtdesc = new RenderTextureDescriptor(
+                source.width, source.height, RenderTextureFormat.ARGBHalf, 0);
+            rtdesc.sRGB = false;
 
-            mat.Data.SetColor(PROP_COLOR, baseColor);
-            mat.Data.SetMatrix(PROP_COLORS, colors);
-            mat.Data.SetMatrix(PROP_POSS, poss);
-            mat.Data.SetVector(PROP_THROTTLES, throttles);
+            GenerateNoiseTextures(rtdesc);
+
+            var src = RenderTexture.GetTemporary(rtdesc);
+            RenderTexture dst;
+            Graphics.Blit(source, src);
+
+            var aspect = (float)source.width / source.height;
+            for (var i = 0; i < gradations.Length; i++) {
+                var g = gradations[i];
+                if (g == null)
+                    continue;
+
+                g.Aspect = aspect;
+
+                dst = RenderTexture.GetTemporary(rtdesc);
+
+                gradientMat.SetTexture(PROP_MAIN_TEX, source);
+                gradientMat.SetTexture(PROP_GRADIENT_TEX, g.GradientTexture);
+                gradientMat.SetTexture(PROP_NOISE_TEX, noiseTextures[i]);
+
+                gradientMat.SetMatrix(PROP_UV_MATRIX, g.UVMatrix);
+
+                gradientMat.SetColor(PROP_COLOR, gradientColor);
+                gradientMat.SetFloat(PROP_GRADIENT_GAIN, gradientGain);
+                gradientMat.SetFloat(PROP_NOISE_GAIN, noiseGain);
+
+                Graphics.Blit(src, dst, gradientMat);
+
+                RenderTexture.ReleaseTemporary(src);
+                src = dst;
+            }
+
+            Graphics.Blit(src, destination);
+            RenderTexture.ReleaseTemporary(src);
         }
 
+        private void GenerateNoiseTextures(RenderTextureDescriptor rtdesc) {
+            if (noiseTextures == null || noiseTextures.Length != gradations.Length) {
+                if (noiseTextures != null)
+                    foreach (var ntex in noiseTextures)
+                        ntex.Dispose();
+                noiseTextures = new ScopedObject<RenderTexture>[gradations.Length];
+            }
+            for (var i = 0; i < noiseTextures.Length; i++) {
+                if (noiseTextures[i] == null)
+                    noiseTextures[i] = new ScopedObject<RenderTexture>(
+                        new RenderTexture(rtdesc));
 
-        protected bool TryToFindNearestDropIndex(out int dropIndex) {
-            dropIndex = -1;
-            var sqdist = float.MaxValue;
-            for (var i = 0; i < data.drops.Length; i++) {
-                var dd = (data.drops[i].center - prevPos).sqrMagnitude;
-                if (dd < sqdist) {
-                    sqdist = dd;
-                    dropIndex = i;
+                var tex = noiseTextures[i];
+                Graphics.Blit(null, tex, noiseMat);
+                noiseTextures[i] = new ScopedObject<RenderTexture>(tex);
+            }
+        }
+
+        [System.Serializable]
+        public class Gradation : System.IDisposable {
+            public const int TEX_DENSITY = 256;
+
+            [SerializeField] protected Gradient grad;
+            [Range(-1f, 1f)]
+            [SerializeField]
+            protected float offset = 0f;
+            [Range(0f, 360f)]
+            [SerializeField]
+            protected float rotation = 0f;
+            [SerializeField]
+            protected TextureWrapMode wrapMode = TextureWrapMode.Repeat;
+
+            protected Validator validator = new Validator();
+            protected ScopedObject<Texture2D> tex;
+            protected Reactive<float> aspect;
+            protected Matrix4x4 uvMatrix;
+
+            public Gradation() {
+                aspect = new Reactive<float>(1f);
+
+                aspect.Changed += (v) => validator.Invalidate();
+
+                validator.Validation += () => {
+                    GenerateGradiantTexture();
+                    GenerateUVMatrix();
+                };
+            }
+
+            public Texture GradientTexture {
+                get {
+                    validator.CheckValidation();
+                    return tex;
                 }
             }
-            return dropIndex >= 0;
-        }
+            public float Aspect {
+                set {
+                    aspect.Value = value;
+                }
+            }
+            public Matrix4x4 UVMatrix {
+                get {
+                    validator.CheckValidation();
+                    return uvMatrix;
+                }
+            }
 
-        protected Matrix4x4 ToMatrix(params Vector4[] cols) {
-            var m = Matrix4x4.zero;
-            for (var i = 0; i < 4 && i < cols.Length; i++)
-                m.SetColumn(i, cols[i]);
-            return m;
-        }
-        protected Matrix4x4 ToMatrix(params Color[] cols) {
-            return ToMatrix(cols.Select(c=>(Vector4)(c.linear)).ToArray());
-        }
-        protected Vector4 ToVector4(params float[] vs) {
-            var v = Vector4.zero;
-            for (var i = 0; i < 4 && i < vs.Length; i++)
-                v[i] = vs[i];
-            return v;
-        }
+            public void Dispose() {
+                if (tex != null && !tex.Disposed) {
+                    tex.Dispose();
+                }
+            }
 
-        protected IEnumerable<Color> Colors {
-            get { return data.drops.Select(d => d.color); }
-        }
-        protected IEnumerable<Vector4> Poss {
-            get { return data.drops.Select(d => (Vector4)d.center); }
-        }        
-        protected IEnumerable<float> Throttles {
-            get { return data.drops.Select(d => d.throttle); }
+            public void Invalidate() {
+                validator.Invalidate();
+            }
+            public void GenerateGradiantTexture() {
+                if (tex == null) {
+                    tex = new ScopedObject<Texture2D>(
+                        new Texture2D(1, 1, TextureFormat.RGBAHalf, false, true));
+                }
+
+                tex.Data.filterMode = FilterMode.Bilinear;
+                tex.Data.wrapMode = wrapMode;
+                tex.Data.Resize(TEX_DENSITY, 1);
+
+                var pixels = tex.Data.GetPixels();
+                var dx = 1f / (tex.Data.width - 1);
+                for (var i = 0; i < tex.Data.width; i++) {
+                    var c = grad.Evaluate(i * dx);
+                    pixels[i] = c;
+                }
+                tex.Data.SetPixels(pixels);
+                tex.Data.Apply();
+            }
+
+            protected void GenerateUVMatrix() {
+                uvMatrix = Matrix4x4.Translate(new Vector3(-offset, -offset, 0f))
+                    * Matrix4x4.Translate(new Vector3(0.5f, 0.5f, 0f))
+                    * Matrix4x4.Rotate(Quaternion.Euler(0f, 0f, rotation))
+                    * Matrix4x4.Scale(new Vector3(1f, 1f / aspect, 1f))
+                    * Matrix4x4.Translate(new Vector3(-0.5f, -0.5f, 0f));
+            }
         }
     }
 }
