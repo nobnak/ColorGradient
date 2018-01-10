@@ -12,10 +12,14 @@ namespace nobnak.ColorGradientSystem {
         public const string PROP_MAIN_TEX = "_MainTex";
         public const string PROP_GRADIENT_TEX = "_GradientTex";
         public const string PROP_NOISE_TEX = "_NoiseTex";
-        public const string PROP_UV_MATRIX = "_UVMatrix";
+
+        public const string PROP_UV_GRADIEN_MATRIX = "_GradientMatrix";
+
         public const string PROP_COLOR = "_Color";
         public const string PROP_GRADIENT_GAIN = "_GradientGain";
         public const string PROP_NOISE_GAIN = "_NoiseGain";
+        public const string PROP_BLEND_MODE = "_BlendMode";
+
 
         [SerializeField] protected Material gradientMat;
         [SerializeField] protected Material noiseMat;
@@ -28,6 +32,9 @@ namespace nobnak.ColorGradientSystem {
         [Range(0f, 10f)]
         [SerializeField]
         protected float noiseGain;
+        [Range(0, 15)]
+        [SerializeField]
+        protected int blendMode = 0;
 
         protected Validator validator = new Validator();
         protected ScopedObject<RenderTexture>[] noiseTextures;
@@ -73,11 +80,12 @@ namespace nobnak.ColorGradientSystem {
                 gradientMat.SetTexture(PROP_GRADIENT_TEX, g.GradientTexture);
                 gradientMat.SetTexture(PROP_NOISE_TEX, noiseTextures[i]);
 
-                gradientMat.SetMatrix(PROP_UV_MATRIX, g.UVMatrix);
+                gradientMat.SetMatrix(PROP_UV_GRADIEN_MATRIX, g.UVGradientMatrix);
 
                 gradientMat.SetColor(PROP_COLOR, gradientColor);
                 gradientMat.SetFloat(PROP_GRADIENT_GAIN, gradientGain);
                 gradientMat.SetFloat(PROP_NOISE_GAIN, noiseGain);
+                gradientMat.SetInt(PROP_BLEND_MODE, blendMode);
 
                 Graphics.Blit(src, dst, gradientMat);
 
@@ -124,7 +132,7 @@ namespace nobnak.ColorGradientSystem {
             protected Validator validator = new Validator();
             protected ScopedObject<Texture2D> tex;
             protected Reactive<float> aspect;
-            protected Matrix4x4 uvMatrix;
+            protected Matrix4x4 uvGradientMatrix;
 
             public Gradation() {
                 aspect = new Reactive<float>(1f);
@@ -133,7 +141,7 @@ namespace nobnak.ColorGradientSystem {
 
                 validator.Validation += () => {
                     GenerateGradiantTexture();
-                    GenerateUVMatrix();
+                    GenerateUVGradientMatrix();
                 };
             }
 
@@ -148,11 +156,8 @@ namespace nobnak.ColorGradientSystem {
                     aspect.Value = value;
                 }
             }
-            public Matrix4x4 UVMatrix {
-                get {
-                    validator.CheckValidation();
-                    return uvMatrix;
-                }
+            public Matrix4x4 UVGradientMatrix {
+                get { validator.CheckValidation(); return uvGradientMatrix; }
             }
 
             public void Dispose() {
@@ -178,14 +183,14 @@ namespace nobnak.ColorGradientSystem {
                 var dx = 1f / (tex.Data.width - 1);
                 for (var i = 0; i < tex.Data.width; i++) {
                     var c = grad.Evaluate(i * dx);
-                    pixels[i] = c;
+                    pixels[i] = c.linear;
                 }
                 tex.Data.SetPixels(pixels);
                 tex.Data.Apply();
             }
 
-            protected void GenerateUVMatrix() {
-                uvMatrix = Matrix4x4.Translate(new Vector3(-offset, -offset, 0f))
+            protected void GenerateUVGradientMatrix() {
+                uvGradientMatrix = Matrix4x4.Translate(new Vector3(-offset, -offset, 0f))
                     * Matrix4x4.Translate(new Vector3(0.5f, 0.5f, 0f))
                     * Matrix4x4.Rotate(Quaternion.Euler(0f, 0f, rotation))
                     * Matrix4x4.Scale(new Vector3(1f, 1f / aspect, 1f))

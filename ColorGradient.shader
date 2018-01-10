@@ -8,6 +8,8 @@
 
 		_NoiseTex ("Noise", 2D) = "black" {}
 		_NoiseGain ("Noise Gain", Range(0,1)) = 0
+
+		_BlendMode ("Blend Mode", Int) = 0
 	}
 	SubShader {
 		Cull Off ZWrite Off ZTest Always
@@ -18,7 +20,7 @@
 			#pragma fragment frag
 			
 			#include "UnityCG.cginc" 
-			#include "Assets/Packages/Gist/CGIncludes/BlendMode.cginc"
+			#include "Assets/Packages/Gist/CGIncludes/BlendMode.cginc" 
 
 			struct appdata {
 				float4 vertex : POSITION;
@@ -38,8 +40,9 @@
 			float _GradientGain;
 			float _NoiseGain;
 
-			float4x4 _UVMatrix;
-			float4x4 _NoiseMatrix;
+			float4x4 _GradientMatrix;
+
+			int _BlendMode;
 
 			v2f vert (appdata v) {
 				v2f o;
@@ -48,14 +51,14 @@
 				return o;
 			}
 			float4 frag (v2f i) : SV_Target 	{
-				float gnoise = _NoiseGain * (2.0 * tex2D(_NoiseTex, i.uv).x - 1.0);
+				float gnoise = _NoiseGain * (2 * tex2D(_NoiseTex, i.uv).x - 1.0);
+
 				float4 cmain = tex2D(_MainTex, i.uv);
 
-				float4 vgrad = float4(i.uv, 0, 1);
-				float4 cgrad = _GradientGain 
-					* tex2D(_GradientTex, mul(_UVMatrix, vgrad).xy + float2(gnoise, 0));
+				float gradU = mul(_GradientMatrix, float4(i.uv, 0, 1)).x + gnoise;
+				float4 cgrad = _GradientGain * tex2D(_GradientTex, float2(gradU, 0));
 				
-				return blend_mode4(cmain, cgrad * _Color, 8);
+				return blend_mode4(cmain, cgrad * _Color, _BlendMode);
 			}
 			ENDCG
 		}
