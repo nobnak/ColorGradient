@@ -9,7 +9,27 @@ namespace nobnak.ColorGradientSystem {
 
     [ExecuteInEditMode]
     public class ColorGradient : MonoBehaviour {
-        public const string PROP_MAIN_TEX = "_MainTex";
+        public enum NoiseActivityEnum { NONE = 0, NOISE_ENABLED }
+        public enum BlendModeEnum {
+            blend_darken = 0,
+            blend_multiply,
+            blend_color_burn,
+            blend_lienar_burn,
+            blend_lighten,
+            blend_screen,
+            blend_color_dodge,
+            blend_linear_dodge,
+            blend_overlay,
+            blend_soft_light,
+            blend_hard_light,
+            blend_vivid_light,
+            blend_linear_light,
+            blend_pin_light,
+            blend_difference,
+            blend_exclusion
+        }
+
+    public const string PROP_MAIN_TEX = "_MainTex";
         public const string PROP_GRADIENT_TEX = "_GradientTex";
         public const string PROP_NOISE_TEX = "_NoiseTex";
 
@@ -26,15 +46,16 @@ namespace nobnak.ColorGradientSystem {
         [SerializeField] protected Gradation[] gradations;
 
         [SerializeField] protected Color gradientColor = Color.white;
-        [Range(0f, 10f)]
+        [Range(0f, 1f)]
         [SerializeField]
         protected float gradientGain = 1f;
+        [SerializeField]
+        protected NoiseActivityEnum noiseActivity;
         [Range(0f, 10f)]
         [SerializeField]
         protected float noiseGain;
-        [Range(0, 15)]
         [SerializeField]
-        protected int blendMode = 0;
+        protected BlendModeEnum blendMode = 0;
 
         protected Validator validator = new Validator();
         protected ScopedObject<RenderTexture>[] noiseTextures;
@@ -60,11 +81,16 @@ namespace nobnak.ColorGradientSystem {
                 source.width, source.height, RenderTextureFormat.ARGBHalf, 0);
             rtdesc.sRGB = false;
 
-            GenerateNoiseTextures(rtdesc);
+            if (NoiseIsEnabled)
+                GenerateNoiseTextures(rtdesc);
 
             var src = RenderTexture.GetTemporary(rtdesc);
             RenderTexture dst;
             Graphics.Blit(source, src);
+
+            gradientMat.shaderKeywords = null;
+            if (noiseActivity != NoiseActivityEnum.NONE)
+                gradientMat.EnableKeyword(noiseActivity.ToString());
 
             var aspect = (float)source.width / source.height;
             for (var i = 0; i < gradations.Length; i++) {
@@ -78,14 +104,15 @@ namespace nobnak.ColorGradientSystem {
 
                 gradientMat.SetTexture(PROP_MAIN_TEX, source);
                 gradientMat.SetTexture(PROP_GRADIENT_TEX, g.GradientTexture);
-                gradientMat.SetTexture(PROP_NOISE_TEX, noiseTextures[i]);
+                if (NoiseIsEnabled)
+                    gradientMat.SetTexture(PROP_NOISE_TEX, noiseTextures[i]);
 
                 gradientMat.SetMatrix(PROP_UV_GRADIEN_MATRIX, g.UVGradientMatrix);
 
                 gradientMat.SetColor(PROP_COLOR, gradientColor);
                 gradientMat.SetFloat(PROP_GRADIENT_GAIN, gradientGain);
                 gradientMat.SetFloat(PROP_NOISE_GAIN, noiseGain);
-                gradientMat.SetInt(PROP_BLEND_MODE, blendMode);
+                gradientMat.SetInt(PROP_BLEND_MODE, (int)blendMode);
 
                 Graphics.Blit(src, dst, gradientMat);
 
@@ -95,6 +122,10 @@ namespace nobnak.ColorGradientSystem {
 
             Graphics.Blit(src, destination);
             RenderTexture.ReleaseTemporary(src);
+        }
+
+        private bool NoiseIsEnabled {
+            get { return noiseMat != null && noiseGain > 0f && noiseActivity != NoiseActivityEnum.NONE; }
         }
 
         private void GenerateNoiseTextures(RenderTextureDescriptor rtdesc) {

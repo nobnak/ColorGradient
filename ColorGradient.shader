@@ -16,6 +16,8 @@
 
 		Pass {
 			CGPROGRAM
+			#pragma multi_compile ___ NOISE_ENABLED
+
 			#pragma vertex vert
 			#pragma fragment frag
 			
@@ -51,7 +53,10 @@
 				return o;
 			}
 			float4 frag (v2f i) : SV_Target 	{
-				float gnoise = _NoiseGain * (2 * tex2D(_NoiseTex, i.uv).x - 1.0);
+				float gnoise = 0;
+				#ifdef NOISE_ENABLED
+					gnoise = _NoiseGain * (2 * tex2D(_NoiseTex, i.uv).x - 1.0);
+				#endif
 
 				float4 cmain = tex2D(_MainTex, i.uv);
 
