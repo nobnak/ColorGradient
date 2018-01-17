@@ -9,6 +9,7 @@ namespace nobnak.ColorGradientSystem {
     [CreateAssetMenu(fileName = "Gradation", menuName = "ColorGradient/Gradation")]
     public class Gradation : ScriptableObject, System.IDisposable {
         public const int TEX_DENSITY = 256;
+        public const float SQRT_OF_TWO = 1.41421356237f;
 
         public const string PROP_GRADIENT_TEX = "_GradientTex";
         public const string PROP_GRADIENT_OPACITY = "_GradientOpacity";
@@ -16,7 +17,8 @@ namespace nobnak.ColorGradientSystem {
         public const string PROP_UV_GRADIEN_MATRIX = "_GradientMatrix";
 
         public enum BlendModeEnum {
-            blend_darken = 0,
+            blend_normal = 0,
+            blend_darken,
             blend_multiply,
             blend_color_burn,
             blend_lienar_burn,
@@ -102,8 +104,8 @@ namespace nobnak.ColorGradientSystem {
             validator.Invalidate();
         }
         public void GenerateGradiantTexture() {
-            var linear = true;
-            if (tex == null) {
+            var linear = QualitySettings.activeColorSpace == ColorSpace.Linear;
+            if (tex == null || tex.Disposed) {
                 tex = new ScopedObject<Texture2D>(
                     new Texture2D(1, 1, TextureFormat.RGBAHalf, false, linear));
             }
@@ -123,9 +125,11 @@ namespace nobnak.ColorGradientSystem {
         }
 
         protected void GenerateUVGradientMatrix() {
+            var scale = 1f / (ratio * SQRT_OF_TWO);
+
             uvGradientMatrix = Matrix4x4.Translate(new Vector3(0.5f, 0.5f, 0f))
-                * Matrix4x4.Rotate(Quaternion.Euler(0f, 0f, rotation))
-                * Matrix4x4.Scale(new Vector3(1f / ratio, 1f / (ratio * aspect), 1f))
+                * Matrix4x4.Rotate(Quaternion.Euler(0f, 0f, -rotation))
+                * Matrix4x4.Scale(new Vector3(scale, scale, 1f))
                 * Matrix4x4.Translate(new Vector3(-0.5f, -0.5f, 0f));
         }
     }

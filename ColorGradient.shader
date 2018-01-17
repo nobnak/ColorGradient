@@ -15,7 +15,7 @@
 			#pragma fragment frag
 			
 			#include "UnityCG.cginc" 
-			#include "Assets/Packages/Gist/CGIncludes/BlendMode.cginc" 
+			#include "Assets/Packages/Gist/CGIncludes/BlendMode.cginc"  
 
 			struct appdata {
 				float4 vertex : POSITION;

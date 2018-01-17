@@ -33,8 +33,8 @@ namespace nobnak.ColorGradientSystem {
             validator.CheckValidation();
 
             var rtdesc = new RenderTextureDescriptor(
-                source.width, source.height, RenderTextureFormat.ARGBHalf, 0);
-            rtdesc.sRGB = false;
+                source.width, source.height, source.format, 0);
+            rtdesc.sRGB = source.sRGB;
 
             var src = RenderTexture.GetTemporary(rtdesc);
             RenderTexture dst;
