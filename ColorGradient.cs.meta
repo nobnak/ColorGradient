@@ -1,11 +1,13 @@
 fileFormatVersion: 2
 guid: aba80b94cfd43914682d3f3e14a2007c
-timeCreated: 1515263478
+timeCreated: 1516345951
 licenseType: Pro
 MonoImporter:
   externalObjects: {}
   serializedVersion: 2
-  defaultReferences: []
+  defaultReferences:
+  - gradientShader: {fileID: 4800000, guid: dc0b4fde2fe30344a84647a8cf68ee62, type: 3}
+  - gradation: {instanceID: 0}
   executionOrder: 0
   icon: {instanceID: 0}
   userData: 

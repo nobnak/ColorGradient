@@ -1,8 +1,7 @@
 ﻿using nobnak.Gist;
 using nobnak.Gist.Scoped;
-using System.Collections;
-using System.Collections.Generic;
 using UnityEngine;
+using nobnak.Gist.Extensions.Behaviour;
 
 namespace nobnak.ColorGradientSystem {
 
@@ -59,6 +58,7 @@ namespace nobnak.ColorGradientSystem {
         #region Unity
         protected void OnEnable() {
             aspect = new Reactive<float>(1f);
+            tex = new ScopedObject<Texture2D>(null);
 
             aspect.Changed += (v) => validator.Invalidate();
 
@@ -104,11 +104,12 @@ namespace nobnak.ColorGradientSystem {
             validator.Invalidate();
         }
         public void GenerateGradiantTexture() {
+            if (tex == null || tex.Disposed)
+                return;
+
             var linear = QualitySettings.activeColorSpace == ColorSpace.Linear;
-            if (tex == null || tex.Disposed) {
-                tex = new ScopedObject<Texture2D>(
-                    new Texture2D(1, 1, TextureFormat.RGBAHalf, false, linear));
-            }
+            if (tex.Data == null)
+                tex.Data = new Texture2D(1, 1, TextureFormat.RGBAHalf, false, linear);
 
             tex.Data.filterMode = FilterMode.Bilinear;
             tex.Data.wrapMode = wrapMode;

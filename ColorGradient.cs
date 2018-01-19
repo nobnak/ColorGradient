@@ -11,13 +11,15 @@ namespace nobnak.ColorGradientSystem {
     public class ColorGradient : MonoBehaviour {
 
     public const string PROP_MAIN_TEX = "_MainTex";
-
-        [SerializeField] protected Material gradientMat;
+        [SerializeField] protected Shader gradientShader;
         [SerializeField] protected Gradation gradation;
 
         protected Validator validator = new Validator();
+        protected ScopedObject<Material> gradientMat;
 
         private void OnEnable() {
+            gradientMat = new ScopedObject<Material>(new Material(gradientShader));
+
             validator.Validation += () => {
                 if (gradation != null)
                     gradation.Invalidate();
@@ -25,6 +27,7 @@ namespace nobnak.ColorGradientSystem {
         }
         private void OnDisable() {
             validator.Reset();
+            gradientMat.Dispose();
         }
         private void OnValidate() {
             validator.Invalidate();
@@ -40,14 +43,14 @@ namespace nobnak.ColorGradientSystem {
             RenderTexture dst;
             Graphics.Blit(source, src);
 
-            gradientMat.shaderKeywords = null;
+            gradientMat.Data.shaderKeywords = null;
 
             var aspect = (float)source.width / source.height;
             gradation.Aspect = aspect;
 
             dst = RenderTexture.GetTemporary(rtdesc);
 
-            gradientMat.SetTexture(PROP_MAIN_TEX, source);
+            gradientMat.Data.SetTexture(PROP_MAIN_TEX, source);
             gradation.SetMaterialProperties(gradientMat);
             Graphics.Blit(src, dst, gradientMat);
 
