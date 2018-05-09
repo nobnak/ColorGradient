@@ -1,4 +1,4 @@
-﻿using nobnak.Gist;
+using nobnak.Gist;
 using nobnak.Gist.Scoped;
 using UnityEngine;
 using nobnak.Gist.Extensions.Behaviour;
@@ -75,7 +75,7 @@ namespace nobnak.ColorGradientSystem {
 
         public Texture GradientTexture {
             get {
-                validator.CheckValidation();
+                validator.Validate();
                 return tex;
             }
         }
@@ -85,7 +85,7 @@ namespace nobnak.ColorGradientSystem {
             }
         }
         public Matrix4x4 UVGradientMatrix {
-            get { validator.CheckValidation(); return uvGradientMatrix; }
+            get { validator.Validate(); return uvGradientMatrix; }
         }
 
         public void Dispose() {

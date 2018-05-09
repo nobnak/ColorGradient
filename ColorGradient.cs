@@ -1,4 +1,4 @@
-﻿using nobnak.Gist;
+using nobnak.Gist;
 using nobnak.Gist.Extensions.Behaviour;
 using nobnak.Gist.Scoped;
 using System.Collections;
@@ -33,7 +33,7 @@ namespace nobnak.ColorGradientSystem {
             validator.Invalidate();
         }
         private void OnRenderImage(RenderTexture source, RenderTexture destination) {
-            validator.CheckValidation();
+            validator.Validate();
 
             var rtdesc = new RenderTextureDescriptor(
                 source.width, source.height, source.format, 0);
